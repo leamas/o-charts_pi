@@ -29,7 +29,8 @@ jobs:
       image: ubuntu-2004:202101-01
     resource_class: arm.medium
     environment:
-      - OCPN_TARGET: ubuntu-armhf
+      - DOCKER_IMAGE: opencpn/ubuntu-bionic-armhf:v1
+      - TARGET_TUPLE: ubuntu;18.04;armhf
       - CMAKE_BUILD_PARALLEL_LEVEL: 2
     parameters:
       cache-key:
@@ -37,7 +38,7 @@ jobs:
         default: "fp-arm20-v2"
     steps:
       - checkout
-      - run: ci/circleci-build-bionic-armhf.sh
+      - run: ci/circleci-build-ubuntu-armhf.sh
       - run: cd build-ubuntu; /bin/bash < upload.sh
       - run: ci/git-push.sh build-ubuntu
 
@@ -46,7 +47,7 @@ jobs:
       image: ubuntu-2004:202101-01
     resource_class: arm.medium
     environment:
-      - OCPN_TARGET: ubuntu-gtk3-armhf
+      - TARGET_TUPLE: ubuntu;20.04;armhf
       - CMAKE_BUILD_PARALLEL_LEVEL: 2
     parameters:
       cache-key:
@@ -54,9 +55,51 @@ jobs:
         default: "fp-arm20-v2"
     steps:
       - checkout
-      - run: ci/circleci-build-focal-armhf.sh
+      - run: ci/circleci-build-ubuntu-armhf.sh
       - run: cd build-ubuntu; /bin/bash < upload.sh
       - run: ci/git-push.sh build-ubuntu
+
+  build-bullseye-armhf:
+    machine:
+      image: ubuntu-2004:202101-01
+    resource_class: arm.medium
+    environment:
+      - TARGET_TUPLE: debian;11;armhf
+      - OCPN_TARGET: bullseye
+      - CMAKE_BUILD_PARALLEL_LEVEL: 2
+    steps:
+      - checkout
+      - run: ci/circleci-build-debian-armhf.sh
+      - run: cd build-debian; /bin/bash < upload.sh
+      - run: ci/git-push.sh build-debian
+
+  build-buster-armhf:
+    machine:
+      image: ubuntu-2004:202101-01
+    resource_class: arm.medium
+    environment:
+      - TARGET_TUPLE: debian;10;armhf
+      - OCPN_TARGET: buster
+      - CMAKE_BUILD_PARALLEL_LEVEL: 2
+    steps:
+      - checkout
+      - run: ci/circleci-build-debian-armhf.sh
+      - run: cd build-debian; /bin/bash < upload.sh
+      - run: ci/git-push.sh build-debian
+
+  build-bullseye-arm64:
+    machine:
+      image: ubuntu-2004:2022.04.1
+    resource_class: arm.medium
+    environment:
+      - OCPN_TARGET: bullseye-arm64
+      - TARGET_TUPLE: debian;11;arm64
+      - CMAKE_BUILD_PARALLEL_LEVEL: 2
+    steps:
+      - checkout
+      - run: ci/circleci-build-debian-arm64.sh
+      - run: cd build-debian; /bin/bash < upload.sh
+      - run: ci/git-push.sh build-debian
 
   build-flatpak-arm64:
     machine:
@@ -82,7 +125,6 @@ jobs:
         type: string
         default: "fp-x86-20-v2"
     <<: *flatpak-steps
-
 
   build-macos:
     macos:
@@ -136,7 +178,14 @@ jobs:
       - image: circleci/buildpack-deps:buster-scm
     environment:
       - OCPN_TARGET: buster
-      - OCPN_TARGET_TUPLE: debian;10;x86_64
+      - CMAKE_BUILD_PARALLEL_LEVEL: 2
+    <<: *debian-steps
+
+  build-bullseye:
+    docker:
+      - image: circleci/buildpack-deps:bullseye-scm
+    environment:
+      - OCPN_TARGET: bullseye
       - CMAKE_BUILD_PARALLEL_LEVEL: 2
     <<: *debian-steps
 
@@ -163,26 +212,6 @@ jobs:
       - run: ci/circleci-build-android.sh
       - run: sh -c "cd /build-$OCPN_TARGET; /bin/bash < upload.sh"
       - run: sh -c "ci/git-push.sh /build-$OCPN_TARGET"
-
-  build-arm64-debian-bullseye:
-        machine:
-            image: ubuntu-2004:202104-01
-        environment:
-        - OCPN_TARGET=bullseye-arm64
-        - DOCKER_IMAGE=arm64v8/debian:bullseye-backports
-        - BUILD_FLAGS=-j3
-        - BUILD_ENV=debian
-        - BUILD_GTK3: true
-        steps:
-        - checkout
-        - run: chmod a+x ./ci/*.sh
-        - run:
-            command: ci/circleci-build-raspbian-arm64.sh
-            no_output_timeout: 30m
-        - run: sh -c "python3 -m pip install --user --upgrade -q setuptools wheel pip"
-        - run: sh -c "python3 -m pip install --user -q cloudsmith-cli cryptography"
-        - run: sh -c "pip install --upgrade cloudsmith-cli"
-        - run: sh -c "pwd; ls; cd build; ls; /bin/bash < upload.sh"
 
 std-filters: &std-filters
   filters:
@@ -220,6 +249,9 @@ workflows:
       - build-buster:
           <<: *std-filters
 
+      - build-bullseye:
+          <<: *std-filters
+
       - build-android-arm64:
           <<: *std-filters
 
@@ -232,5 +264,11 @@ workflows:
       - build-focal-armhf:
           <<: *std-filters
 
-      - build-arm64-debian-bullseye:
+      - build-bullseye-armhf:
+          <<: *std-filters
+
+      - build-bullseye-arm64:
+          <<: *std-filters
+
+      - build-buster-armhf:
           <<: *std-filters
